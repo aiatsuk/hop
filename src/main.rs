@@ -109,10 +109,10 @@ fn expand_path(path: &str) -> String {
         if let Some(home) = dirs::home_dir() {
             return path.replacen("~", &home.to_string_lossy(), 1);
         }
-    } else if path == "~" {
-        if let Some(home) = dirs::home_dir() {
-            return home.to_string_lossy().to_string();
-        }
+    } else if path == "~"
+        && let Some(home) = dirs::home_dir()
+    {
+        return home.to_string_lossy().to_string();
     }
     path.to_string()
 }
@@ -195,7 +195,7 @@ fn handle_add(name: &str) {
 
     let current_dir = env::current_dir().expect("Could not get current directory");
     let expanded_path = current_dir.to_string_lossy().to_string();
-    if !fs::metadata(&expanded_path).map_or(false, |m| m.is_dir()) {
+    if !fs::metadata(&expanded_path).is_ok_and(|m| m.is_dir()) {
         eprintln!("Current directory is not valid");
         return;
     }
@@ -272,11 +272,12 @@ fn handle_fuzzy() {
             process::exit(1);
         });
 
-    if let Some(ref mut stdin) = child.stdin {
-        if let Err(e) = stdin.write_all(input.as_bytes()) {
-            eprintln!("Failed to write to `fzf`: {}", e);
-            return;
-        }
+    if let Some(ref mut stdin) = child.stdin
+        && let Err(e) = stdin.write_all(input.as_bytes())
+    {
+        eprintln!("Failed to write to `fzf`: {}", e);
+        let _ = child.wait();
+        return;
     }
 
     let output = child.wait_with_output().unwrap_or_else(|e| {
@@ -320,11 +321,11 @@ fn handle_init(shell: &Option<String>, install: bool) {
             };
             path.push(filename);
 
-            if let Some(parent) = path.parent() {
-                if let Err(e) = fs::create_dir_all(parent) {
-                    eprintln!("Failed to create directory {}: {}", parent.display(), e);
-                    return;
-                }
+            if let Some(parent) = path.parent()
+                && let Err(e) = fs::create_dir_all(parent)
+            {
+                eprintln!("Failed to create directory {}: {}", parent.display(), e);
+                return;
             }
 
             match fs::write(&path, script) {
